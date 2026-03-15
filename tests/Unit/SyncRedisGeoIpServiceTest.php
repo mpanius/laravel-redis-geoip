@@ -27,9 +27,9 @@ final class SyncRedisGeoIpServiceTest extends TestCase
 
                 file_put_contents(
                     $path,
-                    "network,country,country_code,continent_code\n"
-                    . "1.2.3.0/24,Australia,AU,OC\n"
-                    . "2001:db8::/126,Exampleland,EX,EU\n",
+                    "network,continent_code,country_code,country_name\n"
+                    . "1.2.3.0/24,OC,AU,Australia\n"
+                    . "2001:db8::/126,EU,EX,Exampleland\n",
                 );
 
                 return new DownloadedSourceFile($path, $url ?? 'https://example.test/geo.csv');

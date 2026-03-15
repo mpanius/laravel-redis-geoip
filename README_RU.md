@@ -4,6 +4,7 @@
 
 Идея простая: PHP не ищет диапазоны IP сам и не читает `mmdb` в рантайме.
 Laravel только нормализует IP и вызывает `FCALL_RO`, а lookup полностью выполняется внутри Redis.
+Сейчас IPLocate отдаёт CSV dataset как ZIP-архив, и пакет во время sync прозрачно извлекает из него внутренний CSV.
 
 ## Что умеет
 
@@ -20,6 +21,7 @@ Laravel только нормализует IP и вызывает `FCALL_RO`, �
 - PHP 8.3+
 - Laravel 11 или 12
 - `ext-redis` с поддержкой `function()` и `fcall_ro()`
+- `ext-zip`
 - Redis 7+
 - клиент `phpredis`
 

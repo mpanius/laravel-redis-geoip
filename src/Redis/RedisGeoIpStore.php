@@ -73,12 +73,18 @@ final class RedisGeoIpStore
             throw new InvalidArgumentException('GeoIP CSV header is missing.');
         }
 
-        $columns = array_flip(array_map('strtolower', array_map('trim', $header)));
-        foreach (['network', 'country', 'country_code', 'continent_code'] as $column) {
+        $columns = $this->mapCsvColumns($header);
+        foreach (['network', 'country_code', 'continent_code'] as $column) {
             if (!array_key_exists($column, $columns)) {
                 fclose($handle);
                 throw new InvalidArgumentException("GeoIP CSV column [{$column}] is required.");
             }
+        }
+
+        $countryColumn = $columns['country'] ?? $columns['country_name'] ?? null;
+        if (!is_int($countryColumn)) {
+            fclose($handle);
+            throw new InvalidArgumentException('GeoIP CSV column [country] or [country_name] is required.');
         }
 
         $ipv4 = [];
@@ -94,7 +100,7 @@ final class RedisGeoIpStore
 
             $record = CountryRangeRecord::fromCsv(
                 network: (string) ($row[$columns['network']] ?? ''),
-                country: (string) ($row[$columns['country']] ?? ''),
+                country: (string) ($row[$countryColumn] ?? ''),
                 countryCode: (string) ($row[$columns['country_code']] ?? ''),
                 continentCode: (string) ($row[$columns['continent_code']] ?? ''),
             );
@@ -196,5 +202,31 @@ final class RedisGeoIpStore
 
         $this->client->exec();
         $entries = [];
+    }
+
+    /**
+     * @param array<int, string|null> $header
+     * @return array<string, int>
+     */
+    private function mapCsvColumns(array $header): array
+    {
+        $normalized = [];
+
+        foreach ($header as $index => $value) {
+            if (!is_string($value)) {
+                continue;
+            }
+
+            $column = strtolower(trim($value));
+            $column = preg_replace('/^\xEF\xBB\xBF/', '', $column) ?? $column;
+
+            if ($column === '') {
+                continue;
+            }
+
+            $normalized[$column] = $index;
+        }
+
+        return $normalized;
     }
 }

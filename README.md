@@ -6,6 +6,7 @@ Native Redis-backed country lookup for Laravel with `phpredis`, Redis 7+ Functio
 
 `laravel-redis-geoip` is designed for high-throughput country resolution where PHP should not perform IP range lookups itself.
 Laravel only normalizes the incoming IP and calls `FCALL_RO`; the actual lookup runs inside Redis.
+IPLocate currently serves the CSV dataset as a ZIP archive, and the package transparently extracts the inner CSV during sync.
 
 ## Features
 
@@ -22,6 +23,7 @@ Laravel only normalizes the incoming IP and calls `FCALL_RO`; the actual lookup 
 - PHP 8.3+
 - Laravel 11 or 12
 - `ext-redis` with `function()` and `fcall_ro()` support
+- `ext-zip`
 - Redis 7.0+
 - `phpredis` client
 
