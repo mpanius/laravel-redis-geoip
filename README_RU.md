@@ -5,6 +5,7 @@
 Идея простая: PHP не ищет диапазоны IP сам и не читает `mmdb` в рантайме.
 Laravel только нормализует IP и вызывает `FCALL_RO`, а lookup полностью выполняется внутри Redis.
 Сейчас IPLocate отдаёт CSV dataset как ZIP-архив, и пакет во время sync прозрачно извлекает из него внутренний CSV.
+Runtime dataset хранит только country code и continent code; полные имена стран из исходного файла намеренно игнорируются.
 
 ## Что умеет
 
@@ -74,7 +75,7 @@ php artisan vendor:publish --provider="Mpanius\LaravelRedisGeoIp\LaravelRedisGeo
 Для IPv4 пакет хранит диапазоны в numeric `zset`:
 
 - `score`: верхняя граница диапазона как unsigned integer
-- `member`: `min\tcountry_code\tcontinent_code\tcountry`
+- `member`: `min\tcountry_code\tcontinent_code`
 
 Lookup:
 
@@ -93,7 +94,7 @@ Lookup:
 Для IPv6 member выглядит так:
 
 ```text
-max_hex_32\tmin_hex_32\tcountry_code\tcontinent_code\tcountry
+max_hex_32\tmin_hex_32\tcountry_code\tcontinent_code
 ```
 
 Это важно, потому что Redis score хранится как `double`, а он не подходит для точного хранения 128-bit IPv6.
@@ -141,7 +142,6 @@ $lookup = app(CountryResolver::class)->resolve($request->ip());
 
 - `$lookup->countryCode`
 - `$lookup->continentCode`
-- `$lookup->country`
 - `$lookup->version`
 - `$lookup->family`
 

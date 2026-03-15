@@ -81,12 +81,6 @@ final class RedisGeoIpStore
             }
         }
 
-        $countryColumn = $columns['country'] ?? $columns['country_name'] ?? null;
-        if (!is_int($countryColumn)) {
-            fclose($handle);
-            throw new InvalidArgumentException('GeoIP CSV column [country] or [country_name] is required.');
-        }
-
         $ipv4 = [];
         $ipv6 = [];
         $importedIpv4 = 0;
@@ -100,7 +94,6 @@ final class RedisGeoIpStore
 
             $record = CountryRangeRecord::fromCsv(
                 network: (string) ($row[$columns['network']] ?? ''),
-                country: (string) ($row[$countryColumn] ?? ''),
                 countryCode: (string) ($row[$columns['country_code']] ?? ''),
                 continentCode: (string) ($row[$columns['continent_code']] ?? ''),
             );

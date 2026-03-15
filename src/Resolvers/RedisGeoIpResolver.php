@@ -21,13 +21,18 @@ final class RedisGeoIpResolver implements CountryResolver
 
     public function resolve(string $ip): ?CountryLookup
     {
+        $version = $this->client->get($this->keys->activeVersion());
+        if (!is_string($version) || $version === '') {
+            return null;
+        }
+
         $family = IpAddressNormalizer::detectFamily($ip);
 
         if ($family === 'ipv4') {
             $payload = $this->client->fcallRo(
                 RedisFunctionLibrary::LOOKUP_V4,
-                [$this->keys->activeVersion()],
-                [$this->keys->rootPrefix(), IpAddressNormalizer::toUnsignedIntString($ip)],
+                [$this->keys->datasetKey($version, 'v4')],
+                [IpAddressNormalizer::toUnsignedIntString($ip), $version],
             );
 
             return CountryLookup::fromRedisResponse($payload, 'ipv4');
@@ -39,8 +44,8 @@ final class RedisGeoIpResolver implements CountryResolver
 
         $payload = $this->client->fcallRo(
             RedisFunctionLibrary::LOOKUP_V6,
-            [$this->keys->activeVersion()],
-            [$this->keys->rootPrefix(), IpAddressNormalizer::toFixedHexString($ip)],
+            [$this->keys->datasetKey($version, 'v6')],
+            [IpAddressNormalizer::toFixedHexString($ip), $version],
         );
 
         return CountryLookup::fromRedisResponse($payload, 'ipv6');

@@ -8,7 +8,6 @@ final class CountryRangeRecord
 {
     public function __construct(
         public readonly string $network,
-        public readonly string $country,
         public readonly string $countryCode,
         public readonly string $continentCode,
         public readonly string $family,
@@ -19,7 +18,6 @@ final class CountryRangeRecord
 
     public static function fromCsv(
         string $network,
-        string $country,
         string $countryCode,
         string $continentCode,
     ): self {
@@ -27,7 +25,6 @@ final class CountryRangeRecord
 
         return new self(
             network: $network,
-            country: self::sanitizeText($country),
             countryCode: strtoupper(trim($countryCode)),
             continentCode: strtoupper(trim($continentCode)),
             family: $range['family'],
@@ -58,7 +55,6 @@ final class CountryRangeRecord
                 $this->min,
                 $this->countryCode,
                 $this->continentCode,
-                $this->country,
             ]);
         }
 
@@ -67,14 +63,6 @@ final class CountryRangeRecord
             $this->min,
             $this->countryCode,
             $this->continentCode,
-            $this->country,
         ]);
-    }
-
-    private static function sanitizeText(string $value): string
-    {
-        $value = str_replace(["\r", "\n", "\t"], ' ', trim($value));
-
-        return preg_replace('/\s+/', ' ', $value) ?? $value;
     }
 }

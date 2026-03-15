@@ -23,12 +23,12 @@ redis.register_function{
             return false
         end
 
-        local min_ip, country_code, continent_code, country = string.match(hits[1], '^(%d+)\t([^\t]*)\t([^\t]*)\t(.*)$')
+        local min_ip, country_code, continent_code = string.match(hits[1], '^(%d+)\t([^\t]*)\t([^\t]*)$')
         if not min_ip or tonumber(min_ip) > tonumber(args[1]) then
             return false
         end
 
-        return {country_code, continent_code, country, args[2]}
+        return {country_code, continent_code, args[2]}
     end
 }
 
@@ -43,12 +43,12 @@ redis.register_function{
             return false
         end
 
-        local max_ip, min_ip, country_code, continent_code, country = string.match(hits[1], '^(%x+)\t(%x+)\t([^\t]*)\t([^\t]*)\t(.*)$')
+        local max_ip, min_ip, country_code, continent_code = string.match(hits[1], '^(%x+)\t(%x+)\t([^\t]*)\t([^\t]*)$')
         if not min_ip or min_ip > args[1] then
             return false
         end
 
-        return {country_code, continent_code, country, args[2]}
+        return {country_code, continent_code, args[2]}
     end
 }
 LUA;
