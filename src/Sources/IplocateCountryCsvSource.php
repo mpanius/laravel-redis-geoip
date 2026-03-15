@@ -2,7 +2,6 @@
 
 namespace Mpanius\LaravelRedisGeoIp\Sources;
 
-use InvalidArgumentException;
 use RuntimeException;
 use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryDatasetSource;

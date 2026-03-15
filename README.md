@@ -7,7 +7,7 @@ Native Redis-backed country lookup for Laravel with `phpredis`, Redis 7+ Functio
 `laravel-redis-geoip` is designed for high-throughput country resolution where PHP should not perform IP range lookups itself.
 Laravel only normalizes the incoming IP and calls `FCALL_RO`; the actual lookup runs inside Redis.
 IPLocate currently serves the CSV dataset as a ZIP archive, and the package transparently extracts the inner CSV during sync.
-The runtime dataset stores country and continent codes only; full country names from the source file are intentionally ignored.
+The runtime dataset stores country codes only; `continent_code` and full country names from the source file are intentionally ignored.
 
 ## Features
 
@@ -87,14 +87,14 @@ return [
 Stores IPv4 ranges in a numeric sorted set:
 
 - `score`: max IPv4 as unsigned integer
-- `member`: `min\tcountry_code\tcontinent_code`
+- `member`: `min\tcountry_code`
 
 Lookup flow:
 
 1. normalize IPv4 to `uint32`
 2. call Redis Function `geoip_country_lookup_v4`
 3. Redis performs `ZRANGE ... BYSCORE LIMIT 0 1`
-4. Redis validates the lower bound and returns country data
+4. Redis validates the lower bound and returns `country_code`
 
 ### `dual`
 
@@ -106,7 +106,7 @@ Uses two datasets:
 IPv6 member format:
 
 ```text
-max_hex_32\tmin_hex_32\tcountry_code\tcontinent_code
+max_hex_32\tmin_hex_32\tcountry_code
 ```
 
 This avoids the precision limit of Redis `double` scores for 128-bit IPv6 addresses.
@@ -148,13 +148,10 @@ The command itself skips work if the dataset is newer than `refresh_after_hours`
 ```php
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryResolver;
 
-$lookup = app(CountryResolver::class)->resolve($request->ip());
+$countryCode = app(CountryResolver::class)->resolve($request->ip());
 
-if ($lookup !== null) {
-    $lookup->countryCode;   // e.g. "DE"
-    $lookup->continentCode; // e.g. "EU"
-    $lookup->version;       // imported dataset version
-    $lookup->family;        // ipv4 or ipv6
+if ($countryCode !== null) {
+    // e.g. "DE"
 }
 ```
 

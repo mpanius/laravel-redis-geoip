@@ -9,7 +9,6 @@ final class CountryRangeRecord
     public function __construct(
         public readonly string $network,
         public readonly string $countryCode,
-        public readonly string $continentCode,
         public readonly string $family,
         public readonly string $min,
         public readonly string $max,
@@ -19,14 +18,12 @@ final class CountryRangeRecord
     public static function fromCsv(
         string $network,
         string $countryCode,
-        string $continentCode,
     ): self {
         $range = CidrRangeParser::parse($network);
 
         return new self(
             network: $network,
             countryCode: strtoupper(trim($countryCode)),
-            continentCode: strtoupper(trim($continentCode)),
             family: $range['family'],
             min: $range['min'],
             max: $range['max'],
@@ -54,7 +51,6 @@ final class CountryRangeRecord
             return implode("\t", [
                 $this->min,
                 $this->countryCode,
-                $this->continentCode,
             ]);
         }
 
@@ -62,7 +58,6 @@ final class CountryRangeRecord
             $this->max,
             $this->min,
             $this->countryCode,
-            $this->continentCode,
         ]);
     }
 }

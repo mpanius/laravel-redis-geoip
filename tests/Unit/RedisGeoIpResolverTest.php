@@ -17,7 +17,7 @@ final class RedisGeoIpResolverTest extends TestCase
     {
         $client = new FakeRedisClient();
         $client->strings['{geoip}:country:active_version'] = 'v123';
-        $client->fcallRoHandler = static fn (): array => ['AU', 'OC', 'v123'];
+        $client->fcallRoHandler = static fn (): string => 'AU';
 
         $resolver = new RedisGeoIpResolver(
             client: $client,
@@ -27,11 +27,10 @@ final class RedisGeoIpResolverTest extends TestCase
 
         $lookup = $resolver->resolve('1.2.3.4');
 
-        self::assertSame('AU', $lookup?->countryCode);
+        self::assertSame('AU', $lookup);
         self::assertSame(RedisFunctionLibrary::LOOKUP_V4, $client->fcallRoCalls[0]['function']);
         self::assertSame(['{geoip}:country:v:v123:v4'], $client->fcallRoCalls[0]['keys']);
         self::assertSame('16909060', $client->fcallRoCalls[0]['args'][0]);
-        self::assertSame('v123', $client->fcallRoCalls[0]['args'][1]);
     }
 
     public function test_it_skips_ipv6_lookups_in_ipv4_mode(): void
@@ -51,7 +50,7 @@ final class RedisGeoIpResolverTest extends TestCase
     {
         $client = new FakeRedisClient();
         $client->strings['{geoip}:country:active_version'] = 'v456';
-        $client->fcallRoHandler = static fn (): array => ['DE', 'EU', 'v456'];
+        $client->fcallRoHandler = static fn (): string => 'DE';
 
         $resolver = new RedisGeoIpResolver(
             client: $client,
@@ -61,7 +60,7 @@ final class RedisGeoIpResolverTest extends TestCase
 
         $lookup = $resolver->resolve('2001:db8::1');
 
-        self::assertSame('DE', $lookup?->countryCode);
+        self::assertSame('DE', $lookup);
         self::assertSame(RedisFunctionLibrary::LOOKUP_V6, $client->fcallRoCalls[0]['function']);
         self::assertSame(['{geoip}:country:v:v456:v6'], $client->fcallRoCalls[0]['keys']);
         self::assertSame(

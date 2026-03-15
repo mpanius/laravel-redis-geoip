@@ -2,9 +2,7 @@
 
 namespace Mpanius\LaravelRedisGeoIp\Contracts;
 
-use Mpanius\LaravelRedisGeoIp\Data\CountryLookup;
-
 interface CountryResolver
 {
-    public function resolve(string $ip): ?CountryLookup;
+    public function resolve(string $ip): ?string;
 }

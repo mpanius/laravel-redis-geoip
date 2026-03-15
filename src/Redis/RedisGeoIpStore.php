@@ -74,7 +74,7 @@ final class RedisGeoIpStore
         }
 
         $columns = $this->mapCsvColumns($header);
-        foreach (['network', 'country_code', 'continent_code'] as $column) {
+        foreach (['network', 'country_code'] as $column) {
             if (!array_key_exists($column, $columns)) {
                 fclose($handle);
                 throw new InvalidArgumentException("GeoIP CSV column [{$column}] is required.");
@@ -95,7 +95,6 @@ final class RedisGeoIpStore
             $record = CountryRangeRecord::fromCsv(
                 network: (string) ($row[$columns['network']] ?? ''),
                 countryCode: (string) ($row[$columns['country_code']] ?? ''),
-                continentCode: (string) ($row[$columns['continent_code']] ?? ''),
             );
 
             if ($record->isIpv4()) {

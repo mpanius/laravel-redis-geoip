@@ -5,7 +5,6 @@ namespace Mpanius\LaravelRedisGeoIp\Resolvers;
 use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryResolver;
 use Mpanius\LaravelRedisGeoIp\Contracts\RedisClient;
-use Mpanius\LaravelRedisGeoIp\Data\CountryLookup;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisFunctionLibrary;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpKeys;
 use Mpanius\LaravelRedisGeoIp\Support\IpAddressNormalizer;
@@ -19,7 +18,7 @@ final class RedisGeoIpResolver implements CountryResolver
     ) {
     }
 
-    public function resolve(string $ip): ?CountryLookup
+    public function resolve(string $ip): ?string
     {
         $version = $this->client->get($this->keys->activeVersion());
         if (!is_string($version) || $version === '') {
@@ -32,10 +31,10 @@ final class RedisGeoIpResolver implements CountryResolver
             $payload = $this->client->fcallRo(
                 RedisFunctionLibrary::LOOKUP_V4,
                 [$this->keys->datasetKey($version, 'v4')],
-                [IpAddressNormalizer::toUnsignedIntString($ip), $version],
+                [IpAddressNormalizer::toUnsignedIntString($ip)],
             );
 
-            return CountryLookup::fromRedisResponse($payload, 'ipv4');
+            return is_string($payload) && $payload !== '' ? $payload : null;
         }
 
         if (!$this->config->mode()->supportsIpv6()) {
@@ -45,9 +44,9 @@ final class RedisGeoIpResolver implements CountryResolver
         $payload = $this->client->fcallRo(
             RedisFunctionLibrary::LOOKUP_V6,
             [$this->keys->datasetKey($version, 'v6')],
-            [IpAddressNormalizer::toFixedHexString($ip), $version],
+            [IpAddressNormalizer::toFixedHexString($ip)],
         );
 
-        return CountryLookup::fromRedisResponse($payload, 'ipv6');
+        return is_string($payload) && $payload !== '' ? $payload : null;
     }
 }
