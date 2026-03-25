@@ -15,7 +15,6 @@ final class RedisFunctionLibraryTest extends TestCase
 
         self::assertStringContainsString("#!lua name=" . RedisFunctionLibrary::LIBRARY, $source);
         self::assertStringContainsString("function_name='" . RedisFunctionLibrary::LOOKUP_V4 . "'", $source);
-        self::assertStringContainsString("function_name='" . RedisFunctionLibrary::LOOKUP_V6 . "'", $source);
         self::assertStringContainsString("flags={'no-writes'}", $source);
     }
 }

@@ -1,8 +1,6 @@
 <?php
 
 return [
-    'mode' => env('REDIS_GEOIP_MODE', 'ipv4'),
-
     'redis' => [
         'connection' => env('REDIS_GEOIP_CONNECTION', 'default'),
         'prefix' => env('REDIS_GEOIP_PREFIX', '{geoip}:country'),

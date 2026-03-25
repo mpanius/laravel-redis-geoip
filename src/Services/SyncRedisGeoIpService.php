@@ -6,7 +6,6 @@ use DateTimeImmutable;
 use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryDatasetSource;
 use Mpanius\LaravelRedisGeoIp\Data\ImportStats;
-use Mpanius\LaravelRedisGeoIp\Enums\RedisGeoIpMode;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpStore;
 
 final class SyncRedisGeoIpService
@@ -38,7 +37,6 @@ final class SyncRedisGeoIpService
 
     public function sync(
         bool $force = false,
-        ?RedisGeoIpMode $modeOverride = null,
         ?string $sourceUrlOverride = null,
         ?int $keepVersionsOverride = null,
         ?int $refreshAfterHoursOverride = null,
@@ -51,10 +49,9 @@ final class SyncRedisGeoIpService
 
         try {
             $version = gmdate('Ymd\THis\Z');
-            $mode = $modeOverride ?? $this->config->mode();
 
             $this->store->loadFunctionLibrary();
-            $stats = $this->store->importCsv($download->path, $version, $mode, $download->url);
+            $stats = $this->store->importCsv($download->path, $version, $download->url);
             $this->store->activateVersion($stats);
             $this->store->pruneVersions($keepVersionsOverride ?? $this->config->keepVersions(), [$version]);
 

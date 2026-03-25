@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Mpanius\LaravelRedisGeoIp\Tests\Unit;
 
-use Mpanius\LaravelRedisGeoIp\Enums\RedisGeoIpMode;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpKeys;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpStore;
 use Mpanius\LaravelRedisGeoIp\Tests\Support\FakeRedisClient;
@@ -12,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 final class RedisGeoIpStoreTest extends TestCase
 {
-    public function test_it_imports_ipv4_only_mode_without_ipv6_ranges(): void
+    public function test_it_imports_ipv4_ranges(): void
     {
         $client = new FakeRedisClient();
         $keys = new RedisGeoIpKeys('{geoip}:country');
@@ -20,16 +19,13 @@ final class RedisGeoIpStoreTest extends TestCase
         $path = $this->createCsv();
 
         try {
-            $stats = $store->importCsv($path, 'v1', RedisGeoIpMode::Ipv4, 'https://example.test/geo.csv');
+            $stats = $store->importCsv($path, 'v1', 'https://example.test/geo.csv');
         } finally {
             unlink($path);
         }
 
         self::assertSame(1, $stats->importedIpv4);
-        self::assertSame(0, $stats->importedIpv6);
-        self::assertSame(1, $stats->skippedIpv6);
         self::assertCount(1, $client->zsets[$keys->datasetKey('v1', 'v4')]);
-        self::assertArrayNotHasKey($keys->datasetKey('v1', 'v6'), $client->zsets);
     }
 
     public function test_it_activates_and_prunes_versions(): void
@@ -40,9 +36,9 @@ final class RedisGeoIpStoreTest extends TestCase
         $path = $this->createCsv();
 
         try {
-            $statsV1 = $store->importCsv($path, 'v1', RedisGeoIpMode::Dual, 'https://example.test/geo.csv');
-            $statsV2 = $store->importCsv($path, 'v2', RedisGeoIpMode::Dual, 'https://example.test/geo.csv');
-            $statsV3 = $store->importCsv($path, 'v3', RedisGeoIpMode::Dual, 'https://example.test/geo.csv');
+            $statsV1 = $store->importCsv($path, 'v1', 'https://example.test/geo.csv');
+            $statsV2 = $store->importCsv($path, 'v2', 'https://example.test/geo.csv');
+            $statsV3 = $store->importCsv($path, 'v3', 'https://example.test/geo.csv');
         } finally {
             unlink($path);
         }
@@ -57,7 +53,36 @@ final class RedisGeoIpStoreTest extends TestCase
         self::assertSame('v3', $metadata['version']);
         self::assertCount(2, $client->zsets[$keys->versions()]);
         self::assertArrayNotHasKey($keys->datasetKey('v1', 'v4'), $client->zsets);
-        self::assertArrayHasKey($keys->datasetKey('v3', 'v6'), $client->zsets);
+        self::assertArrayHasKey($keys->datasetKey('v3', 'v4'), $client->zsets);
+    }
+
+    public function test_it_skips_empty_and_unsupported_rows_without_aborting_import(): void
+    {
+        $client = new FakeRedisClient();
+        $keys = new RedisGeoIpKeys('{geoip}:country');
+        $store = new RedisGeoIpStore($client, $keys, 2);
+        $path = tempnam(sys_get_temp_dir(), 'geoip-test-');
+
+        file_put_contents(
+            $path,
+            "network,continent_code,country_code,country_name\n"
+            . "1.2.3.0/24,OC,AU,Australia\n"
+            . "bad-cidr,EU,DE,Germany\n"
+            . ",EU,DE,Germany\n"
+            . "5.6.7.0/24,EU,,NoCountry\n"
+            . "2001:db8::/126,EU,EX,Exampleland\n",
+        );
+
+        try {
+            $stats = $store->importCsv($path, 'v1', 'https://example.test/geo.csv');
+        } finally {
+            unlink($path);
+        }
+
+        self::assertSame(1, $stats->importedIpv4);
+        self::assertSame(1, $stats->skippedEmpty);
+        self::assertSame(3, $stats->skippedInvalid);
+        self::assertCount(1, $client->zsets[$keys->datasetKey('v1', 'v4')]);
     }
 
     private function createCsv(): string
@@ -67,8 +92,7 @@ final class RedisGeoIpStoreTest extends TestCase
         file_put_contents(
             $path,
             "network,continent_code,country_code,country_name\n"
-            . "1.2.3.0/24,OC,AU,Australia\n"
-            . "2001:db8::/126,EU,EX,Exampleland\n",
+            . "1.2.3.0/24,OC,AU,Australia\n",
         );
 
         return $path;

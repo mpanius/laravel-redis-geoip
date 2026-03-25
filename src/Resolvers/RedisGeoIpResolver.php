@@ -2,7 +2,7 @@
 
 namespace Mpanius\LaravelRedisGeoIp\Resolvers;
 
-use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
+use InvalidArgumentException;
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryResolver;
 use Mpanius\LaravelRedisGeoIp\Contracts\RedisClient;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisFunctionLibrary;
@@ -14,7 +14,6 @@ final class RedisGeoIpResolver implements CountryResolver
     public function __construct(
         private readonly RedisClient $client,
         private readonly RedisGeoIpKeys $keys,
-        private readonly RedisGeoIpConfig $config,
     ) {
     }
 
@@ -25,9 +24,7 @@ final class RedisGeoIpResolver implements CountryResolver
             return null;
         }
 
-        $family = IpAddressNormalizer::detectFamily($ip);
-
-        if ($family === 'ipv4') {
+        try {
             $payload = $this->client->fcallRo(
                 RedisFunctionLibrary::LOOKUP_V4,
                 [$this->keys->datasetKey($version, 'v4')],
@@ -35,18 +32,8 @@ final class RedisGeoIpResolver implements CountryResolver
             );
 
             return is_string($payload) && $payload !== '' ? $payload : null;
-        }
-
-        if (!$this->config->mode()->supportsIpv6()) {
+        } catch (InvalidArgumentException) {
             return null;
         }
-
-        $payload = $this->client->fcallRo(
-            RedisFunctionLibrary::LOOKUP_V6,
-            [$this->keys->datasetKey($version, 'v6')],
-            [IpAddressNormalizer::toFixedHexString($ip)],
-        );
-
-        return is_string($payload) && $payload !== '' ? $payload : null;
     }
 }

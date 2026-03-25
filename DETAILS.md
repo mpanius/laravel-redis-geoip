@@ -4,6 +4,7 @@
 
 ## Source Dataset Notes
 
+- The current release is IPv4-only.
 - IPLocate currently redirects the `.csv` endpoint to a ZIP archive.
 - The ZIP archive contains a single CSV file such as `ip-to-country-20260314.csv`.
 - The observed CSV header is `network,continent_code,country_code,country_name`.

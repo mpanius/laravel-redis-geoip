@@ -75,7 +75,6 @@ final class LaravelRedisGeoIpServiceProvider extends PackageServiceProvider
             return new RedisGeoIpResolver(
                 client: $app->make(RedisClient::class),
                 keys: $app->make(RedisGeoIpKeys::class),
-                config: $app->make(RedisGeoIpConfig::class),
             );
         });
 

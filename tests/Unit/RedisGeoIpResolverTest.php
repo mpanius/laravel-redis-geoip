@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Mpanius\LaravelRedisGeoIp\Tests\Unit;
 
-use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisFunctionLibrary;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpKeys;
 use Mpanius\LaravelRedisGeoIp\Resolvers\RedisGeoIpResolver;
@@ -22,7 +21,6 @@ final class RedisGeoIpResolverTest extends TestCase
         $resolver = new RedisGeoIpResolver(
             client: $client,
             keys: new RedisGeoIpKeys('{geoip}:country'),
-            config: RedisGeoIpConfig::fromArray(['mode' => 'ipv4']),
         );
 
         $lookup = $resolver->resolve('1.2.3.4');
@@ -33,39 +31,31 @@ final class RedisGeoIpResolverTest extends TestCase
         self::assertSame('16909060', $client->fcallRoCalls[0]['args'][0]);
     }
 
-    public function test_it_skips_ipv6_lookups_in_ipv4_mode(): void
+    public function test_it_returns_null_for_unsupported_non_ipv4_addresses(): void
     {
         $client = new FakeRedisClient();
+        $client->strings['{geoip}:country:active_version'] = 'v456';
+
         $resolver = new RedisGeoIpResolver(
             client: $client,
             keys: new RedisGeoIpKeys('{geoip}:country'),
-            config: RedisGeoIpConfig::fromArray(['mode' => 'ipv4']),
         );
 
         self::assertNull($resolver->resolve('2001:db8::1'));
         self::assertSame([], $client->fcallRoCalls);
     }
 
-    public function test_it_resolves_ipv6_addresses_in_dual_mode(): void
+    public function test_it_returns_null_for_invalid_ip_addresses(): void
     {
         $client = new FakeRedisClient();
-        $client->strings['{geoip}:country:active_version'] = 'v456';
-        $client->fcallRoHandler = static fn (): string => 'DE';
+        $client->strings['{geoip}:country:active_version'] = 'v789';
 
         $resolver = new RedisGeoIpResolver(
             client: $client,
             keys: new RedisGeoIpKeys('{geoip}:country'),
-            config: RedisGeoIpConfig::fromArray(['mode' => 'dual']),
         );
 
-        $lookup = $resolver->resolve('2001:db8::1');
-
-        self::assertSame('DE', $lookup);
-        self::assertSame(RedisFunctionLibrary::LOOKUP_V6, $client->fcallRoCalls[0]['function']);
-        self::assertSame(['{geoip}:country:v:v456:v6'], $client->fcallRoCalls[0]['keys']);
-        self::assertSame(
-            '20010db8000000000000000000000001',
-            $client->fcallRoCalls[0]['args'][0],
-        );
+        self::assertNull($resolver->resolve('not-an-ip'));
+        self::assertSame([], $client->fcallRoCalls);
     }
 }

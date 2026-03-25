@@ -7,7 +7,6 @@ use JsonException;
 use Mpanius\LaravelRedisGeoIp\Contracts\RedisClient;
 use Mpanius\LaravelRedisGeoIp\Data\CountryRangeRecord;
 use Mpanius\LaravelRedisGeoIp\Data\ImportStats;
-use Mpanius\LaravelRedisGeoIp\Enums\RedisGeoIpMode;
 
 final class RedisGeoIpStore
 {
@@ -52,7 +51,6 @@ final class RedisGeoIpStore
     public function importCsv(
         string $path,
         string $version,
-        RedisGeoIpMode $mode,
         string $sourceUrl,
     ): ImportStats {
         $handle = fopen($path, 'rb');
@@ -62,10 +60,9 @@ final class RedisGeoIpStore
         }
 
         $v4Key = $this->keys->datasetKey($version, 'v4');
-        $v6Key = $this->keys->datasetKey($version, 'v6');
         $metaKey = $this->keys->meta($version);
 
-        $this->client->unlink($v4Key, $v6Key, $metaKey);
+        $this->client->unlink($v4Key, $metaKey);
 
         $header = fgetcsv($handle, escape: '\\');
         if (!is_array($header)) {
@@ -82,56 +79,63 @@ final class RedisGeoIpStore
         }
 
         $ipv4 = [];
-        $ipv6 = [];
         $importedIpv4 = 0;
-        $importedIpv6 = 0;
-        $skippedIpv6 = 0;
+        $skippedEmpty = 0;
+        $skippedInvalid = 0;
 
         while (($row = fgetcsv($handle, escape: '\\')) !== false) {
             if (!is_array($row) || $row === []) {
                 continue;
             }
 
-            $record = CountryRangeRecord::fromCsv(
-                network: (string) ($row[$columns['network']] ?? ''),
-                countryCode: (string) ($row[$columns['country_code']] ?? ''),
-            );
-
-            if ($record->isIpv4()) {
-                $ipv4[] = [$record->score(), $record->toRedisMember()];
-                $importedIpv4++;
-
-                if (count($ipv4) >= $this->batchSize) {
-                    $this->flushBatch($v4Key, $ipv4);
-                }
-
+            if (
+                !array_key_exists($columns['network'], $row)
+                || !array_key_exists($columns['country_code'], $row)
+            ) {
+                $skippedInvalid++;
                 continue;
             }
 
-            if (!$mode->supportsIpv6()) {
-                $skippedIpv6++;
+            $network = trim((string) $row[$columns['network']]);
+            $countryCode = trim((string) $row[$columns['country_code']]);
+
+            if ($network === '') {
+                $skippedInvalid++;
                 continue;
             }
 
-            $ipv6[] = [0.0, $record->toRedisMember()];
-            $importedIpv6++;
+            if ($countryCode === '') {
+                $skippedEmpty++;
+                continue;
+            }
 
-            if (count($ipv6) >= $this->batchSize) {
-                $this->flushBatch($v6Key, $ipv6);
+            try {
+                $record = CountryRangeRecord::fromCsv(
+                    network: $network,
+                    countryCode: $countryCode,
+                );
+            } catch (InvalidArgumentException) {
+                $skippedInvalid++;
+                continue;
+            }
+
+            $ipv4[] = [$record->score(), $record->toRedisMember()];
+            $importedIpv4++;
+
+            if (count($ipv4) >= $this->batchSize) {
+                $this->flushBatch($v4Key, $ipv4);
             }
         }
 
         fclose($handle);
 
         $this->flushBatch($v4Key, $ipv4);
-        $this->flushBatch($v6Key, $ipv6);
 
         return new ImportStats(
             version: $version,
-            mode: $mode,
             importedIpv4: $importedIpv4,
-            importedIpv6: $importedIpv6,
-            skippedIpv6: $skippedIpv6,
+            skippedEmpty: $skippedEmpty,
+            skippedInvalid: $skippedInvalid,
             sourceUrl: $sourceUrl,
             syncedAt: gmdate(DATE_ATOM),
         );
@@ -170,7 +174,6 @@ final class RedisGeoIpStore
 
             $this->client->unlink(
                 $this->keys->datasetKey($version, 'v4'),
-                $this->keys->datasetKey($version, 'v6'),
                 $this->keys->meta($version),
             );
             $this->client->zRem($this->keys->versions(), $version);

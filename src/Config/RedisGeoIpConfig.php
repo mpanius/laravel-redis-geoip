@@ -3,12 +3,10 @@
 namespace Mpanius\LaravelRedisGeoIp\Config;
 
 use InvalidArgumentException;
-use Mpanius\LaravelRedisGeoIp\Enums\RedisGeoIpMode;
 
 final class RedisGeoIpConfig
 {
     public function __construct(
-        private readonly RedisGeoIpMode $mode,
         private readonly string $redisConnection,
         private readonly string $prefix,
         private readonly string $sourceUrl,
@@ -30,8 +28,14 @@ final class RedisGeoIpConfig
         $source = $config['source'] ?? [];
         $sync = $config['sync'] ?? [];
 
+        if (
+            array_key_exists('mode', $config)
+            && (string) $config['mode'] !== 'ipv4'
+        ) {
+            throw new InvalidArgumentException('This release is IPv4-only. Remove non-ipv4 mode from configuration.');
+        }
+
         return new self(
-            mode: RedisGeoIpMode::from((string) ($config['mode'] ?? RedisGeoIpMode::Ipv4->value)),
             redisConnection: (string) ($redis['connection'] ?? 'default'),
             prefix: rtrim((string) ($redis['prefix'] ?? '{geoip}:country'), ':'),
             sourceUrl: (string) ($source['url'] ?? ''),
@@ -44,11 +48,6 @@ final class RedisGeoIpConfig
             keepVersions: max(1, (int) ($sync['keep_versions'] ?? 2)),
             batchSize: max(1, (int) ($sync['batch_size'] ?? 1000)),
         );
-    }
-
-    public function mode(): RedisGeoIpMode
-    {
-        return $this->mode;
     }
 
     public function redisConnection(): string

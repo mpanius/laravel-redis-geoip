@@ -2,22 +2,25 @@
 
 [README_RU.md](./README_RU.md) · [DETAILS.md](./DETAILS.md) · [DETAILS_RU.md](./DETAILS_RU.md)
 
-Native Redis-backed country lookup for Laravel with `phpredis`, Redis 7+ Functions, and IPLocate CSV imports.
+Redis-backed IPv4 country lookup for Laravel using `phpredis`, Redis 7+ Functions, and IPLocate CSV imports.
 
-`laravel-redis-geoip` is designed for high-throughput country resolution where PHP should not perform IP range lookups itself.
-Laravel only normalizes the incoming IP and calls `FCALL_RO`; the actual lookup runs inside Redis.
-IPLocate currently serves the CSV dataset as a ZIP archive, and the package transparently extracts the inner CSV during sync.
-The runtime dataset stores country codes only; `continent_code` and full country names from the source file are intentionally ignored.
+This package is optimized for a narrow hot-path use case:
 
-## Features
+- country lookup only
+- IPv4 only in the current stable package surface
+- lookup runs inside Redis, not in PHP
+- one shared dataset for all Laravel heads
 
-- `ipv4-only` mode with numeric `zset` lookups
-- `dual` mode for `IPv4 + IPv6`
+Laravel only normalizes the incoming IP and calls `FCALL_RO`; the range search happens inside Redis. The imported runtime dataset stores `country_code` only. `continent_code` and country names from the source CSV are ignored on purpose.
+
+## What You Get
+
 - native `phpredis` integration via `fcall_ro()` and `function('LOAD', ...)`
-- Redis Functions registered with `flags={'no-writes'}` for read-only execution
-- daily IPLocate CSV sync with versioned datasets
-- no MMDB parsing in the request path
-- Laravel package built with `spatie/laravel-package-tools`
+- Redis Functions registered with `flags={'no-writes'}`
+- versioned imports with atomic `active_version` switch
+- ZIP-aware IPLocate download handling
+- soft runtime behavior: invalid IP input returns `null`
+- tolerant sync behavior: malformed CSV rows are skipped and counted
 
 ## Requirements
 
@@ -60,8 +63,6 @@ Keep the hash tag in the prefix when you customize it. The default `{geoip}:coun
 
 ```php
 return [
-    'mode' => 'ipv4', // or 'dual'
-
     'redis' => [
         'connection' => 'geoip',
         'prefix' => '{geoip}:country',
@@ -80,43 +81,31 @@ return [
 ];
 ```
 
-## Import Modes
+Important:
 
-### `ipv4`
+- the current release is IPv4-only
+- use a dedicated Redis connection with serializer and compression disabled
+- keep the `{geoip}` hash tag in the prefix if you change it
 
-Stores IPv4 ranges in a numeric sorted set:
+## How Lookup Works
+
+The package stores IPv4 ranges in a numeric sorted set:
 
 - `score`: max IPv4 as unsigned integer
 - `member`: `min\tcountry_code`
 
-Lookup flow:
+Runtime flow:
 
 1. normalize IPv4 to `uint32`
 2. call Redis Function `geoip_country_lookup_v4`
 3. Redis performs `ZRANGE ... BYSCORE LIMIT 0 1`
 4. Redis validates the lower bound and returns `country_code`
 
-### `dual`
-
-Uses two datasets:
-
-- IPv4 dataset as described above
-- IPv6 dataset in a lexicographic sorted set
-
-IPv6 member format:
-
-```text
-max_hex_32\tmin_hex_32\tcountry_code
-```
-
-This avoids the precision limit of Redis `double` scores for 128-bit IPv6 addresses.
-
 ## Sync Command
 
 ```bash
 php artisan redis-geoip:sync
 php artisan redis-geoip:sync --force
-php artisan redis-geoip:sync --mode=dual
 php artisan redis-geoip:sync --url="https://example.test/custom.csv"
 ```
 
@@ -128,6 +117,8 @@ What it does:
 4. writes metadata
 5. switches `active_version`
 6. prunes old versions
+
+Malformed CSV rows, non-IPv4 networks, and rows with empty country codes are skipped and counted instead of aborting the whole import.
 
 Recommended scheduler:
 
@@ -155,6 +146,8 @@ if ($countryCode !== null) {
 }
 ```
 
+Invalid or unsupported IP input returns `null`.
+
 ## Redis Keys
 
 The package keeps a small control plane and versioned datasets:
@@ -163,7 +156,6 @@ The package keeps a small control plane and versioned datasets:
 - `{geoip}:country:versions`
 - `{geoip}:country:meta:{version}`
 - `{geoip}:country:v:{version}:v4`
-- `{geoip}:country:v:{version}:v6`
 
 ## Further Reading
 
@@ -173,6 +165,7 @@ Compatibility, multi-head deployment, source dataset notes, and comparison with 
 
 - The request path does not parse MMDB files.
 - The package currently targets country-level lookups only.
+- The current stable package surface is IPv4-only.
 - `phpredis` is required; Predis is intentionally not supported.
 - A dedicated Redis instance or at least a dedicated Redis DB is strongly recommended.
 

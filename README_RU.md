@@ -2,22 +2,25 @@
 
 [README.md](./README.md) · [DETAILS_RU.md](./DETAILS_RU.md) · [DETAILS.md](./DETAILS.md)
 
-Пакет для нативного country lookup по IP через Redis в Laravel.
+Пакет для Redis-backed lookup страны по IPv4 в Laravel.
 
-Идея простая: PHP не ищет диапазоны IP сам и не читает `mmdb` в рантайме.
-Laravel только нормализует IP и вызывает `FCALL_RO`, а lookup полностью выполняется внутри Redis.
-Сейчас IPLocate отдаёт CSV dataset как ZIP-архив, и пакет во время sync прозрачно извлекает из него внутренний CSV.
-Runtime dataset хранит только country code; `continent_code` и полные имена стран из исходного файла намеренно игнорируются.
+Текущий stable scope у пакета узкий и намеренно прагматичный:
 
-## Что умеет
+- только `country_code`
+- только IPv4
+- lookup выполняется внутри Redis, а не в PHP
+- один общий dataset для всех Laravel-heads
 
-- режим `ipv4-only`
-- режим `dual` для `IPv4 + IPv6`
+Laravel только нормализует входящий IP и вызывает `FCALL_RO`; поиск диапазона целиком живёт внутри Redis. IPLocate сейчас отдаёт CSV как ZIP-архив, и пакет во время sync автоматически извлекает внутренний CSV. Runtime dataset хранит только `country_code`; `continent_code` и полные названия стран из исходного файла намеренно игнорируются.
+
+## Что даёт пакет
+
 - работа через `phpredis::fcall_ro()` и `phpredis::function('LOAD', ...)`
 - Redis Functions с `flags={'no-writes'}`
-- загрузка country dataset из IPLocate CSV
-- versioned datasets и переключение `active_version`
-- без lookup-логики диапазонов внутри PHP
+- versioned imports и атомарное переключение `active_version`
+- корректная обработка ZIP-ответа от IPLocate
+- мягкое runtime-поведение: invalid IP возвращает `null`
+- живучий sync: битые CSV-строки пропускаются и считаются
 
 ## Требования
 
@@ -61,7 +64,6 @@ php artisan vendor:publish --provider="Mpanius\LaravelRedisGeoIp\LaravelRedisGeo
 
 Ключевые параметры:
 
-- `mode`: `ipv4` или `dual`
 - `redis.connection`: Redis connection для lookup dataset
 - `redis.prefix`: базовый prefix для ключей
 - `source.url`: URL IPLocate CSV
@@ -70,9 +72,13 @@ php artisan vendor:publish --provider="Mpanius\LaravelRedisGeoIp\LaravelRedisGeo
 - `sync.keep_versions`: сколько версий хранить
 - `sync.batch_size`: размер батча при загрузке
 
-## Режимы работы
+Важно:
 
-### `ipv4`
+- текущий релиз пакета работает только с IPv4
+- Redis connection лучше выделить отдельно и отключить serializer/compression
+- если меняете prefix, сохраняйте hash tag `{geoip}`
+
+## Как Работает Lookup
 
 Для IPv4 пакет хранит диапазоны в numeric `zset`:
 
@@ -86,27 +92,11 @@ Lookup:
 3. Redis делает `ZRANGE ... BYSCORE LIMIT 0 1`
 4. Redis проверяет нижнюю границу и возвращает `country_code`
 
-### `dual`
-
-В dual mode пакет хранит:
-
-- IPv4 в numeric `zset`
-- IPv6 в lexicographic `zset`
-
-Для IPv6 member выглядит так:
-
-```text
-max_hex_32\tmin_hex_32\tcountry_code
-```
-
-Это важно, потому что Redis score хранится как `double`, а он не подходит для точного хранения 128-bit IPv6.
-
 ## Команда синхронизации
 
 ```bash
 php artisan redis-geoip:sync
 php artisan redis-geoip:sync --force
-php artisan redis-geoip:sync --mode=dual
 ```
 
 Что делает команда:
@@ -117,6 +107,8 @@ php artisan redis-geoip:sync --mode=dual
 4. сохраняет metadata
 5. переключает `active_version`
 6. удаляет старые версии
+
+Битые CSV-строки, не-IPv4 сети и строки с пустым `country_code` не валят импорт целиком: они пропускаются и попадают в skip-статистику.
 
 Команду удобно запускать часто, например каждый час. Если свежий dataset уже есть, она ничего не делает.
 
@@ -141,6 +133,7 @@ $countryCode = app(CountryResolver::class)->resolve($request->ip());
 ```
 
 Если lookup найден, вы получите строку вроде `DE`.
+Если IP невалидный или неподдерживаемый, вернётся `null`.
 
 ## Какие ключи создаются в Redis
 
@@ -148,7 +141,6 @@ $countryCode = app(CountryResolver::class)->resolve($request->ip());
 - `{geoip}:country:versions`
 - `{geoip}:country:meta:{version}`
 - `{geoip}:country:v:{version}:v4`
-- `{geoip}:country:v:{version}:v6`
 
 ## Дополнительно
 
@@ -157,6 +149,7 @@ $countryCode = app(CountryResolver::class)->resolve($request->ip());
 ## Ограничения
 
 - пакет сейчас решает только country lookup
+- текущий stable package surface ограничен IPv4
 - request path не умеет читать `mmdb` и специально этого не делает
 - поддерживается только `phpredis`
 - для production лучше использовать отдельный Redis instance или как минимум отдельный Redis DB

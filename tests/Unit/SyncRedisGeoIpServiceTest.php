@@ -6,7 +6,6 @@ namespace Mpanius\LaravelRedisGeoIp\Tests\Unit;
 
 use Mpanius\LaravelRedisGeoIp\Config\RedisGeoIpConfig;
 use Mpanius\LaravelRedisGeoIp\Contracts\CountryDatasetSource;
-use Mpanius\LaravelRedisGeoIp\Enums\RedisGeoIpMode;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpKeys;
 use Mpanius\LaravelRedisGeoIp\Redis\RedisGeoIpStore;
 use Mpanius\LaravelRedisGeoIp\Services\SyncRedisGeoIpService;
@@ -28,8 +27,7 @@ final class SyncRedisGeoIpServiceTest extends TestCase
                 file_put_contents(
                     $path,
                     "network,continent_code,country_code,country_name\n"
-                    . "1.2.3.0/24,OC,AU,Australia\n"
-                    . "2001:db8::/126,EU,EX,Exampleland\n",
+                    . "1.2.3.0/24,OC,AU,Australia\n",
                 );
 
                 return new DownloadedSourceFile($path, $url ?? 'https://example.test/geo.csv');
@@ -40,16 +38,18 @@ final class SyncRedisGeoIpServiceTest extends TestCase
             store: $store,
             source: $source,
             config: RedisGeoIpConfig::fromArray([
-                'mode' => 'dual',
                 'redis' => ['prefix' => '{geoip}:country'],
                 'sync' => ['refresh_after_hours' => 24, 'keep_versions' => 2, 'batch_size' => 2],
             ]),
         );
 
-        $stats = $service->sync(force: true, modeOverride: RedisGeoIpMode::Dual);
+        $stats = $service->sync(force: true);
 
         self::assertNotNull($stats);
         self::assertFalse($service->needsRefresh());
         self::assertSame('LOAD', $client->functionCalls[0]['operation']);
+        self::assertSame(0, $stats->skippedEmpty);
+        self::assertSame(0, $stats->skippedInvalid);
+        self::assertSame(1, $stats->importedIpv4);
     }
 }

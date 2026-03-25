@@ -13,17 +13,14 @@ final class CidrRangeParserTest extends TestCase
     {
         $range = CidrRangeParser::parse('1.2.3.0/24');
 
-        self::assertSame('ipv4', $range['family']);
         self::assertSame('16909056', $range['min']);
         self::assertSame('16909311', $range['max']);
     }
 
-    public function test_it_parses_ipv6_cidr_ranges(): void
+    public function test_it_rejects_non_ipv4_cidr_ranges(): void
     {
-        $range = CidrRangeParser::parse('2001:db8::/126');
+        $this->expectException(\InvalidArgumentException::class);
 
-        self::assertSame('ipv6', $range['family']);
-        self::assertSame('20010db8000000000000000000000000', $range['min']);
-        self::assertSame('20010db8000000000000000000000003', $range['max']);
+        CidrRangeParser::parse('2001:db8::/126');
     }
 }
